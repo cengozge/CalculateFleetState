@@ -1,11 +1,12 @@
 package utility;
 
 import java.io.IOException;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import entity.FileOutputObject;
 import entity.MyObject;
@@ -13,27 +14,31 @@ import enums.EInstanceType;
 
 public class CalculationImplementation {
 
-    // TODO inputtxt file parametre olsun
-    private final static String INPUT_FILE_NAME = "D://FleetState.txt";
-    private final static String OUTPUT_FILE_NAME = "D://Statistics.txt";
-    private final static String LOG_FILE_NAME = "D://Log.txt";
-    private final static Charset ENCODING = StandardCharsets.UTF_8;
-
-    private final static String FULL = "1";
-    private final static String EMPTY = "0";
-
     Utility utility = new Utility();
     FileProcess fp = new FileProcess();
 
+    
+    private static final Logger LOGGER = Logger.getLogger(FileProcess.class.getName());
+    
+    private final static String FULL = "1";
+    private final static String EMPTY = "0";
+    
+    Map<String,String> fileMap = utility.getPropertyValues();
+    
     public void start() throws IOException{
-        List<MyObject> listOfObjects = new FileProcess().getListFromFile(INPUT_FILE_NAME);
-        List<MyObject> calculatedList = calculateFullAndEmpty(listOfObjects);
-        FileOutputObject outputEmpties = calculateEmptiesForInstanceTypes(calculatedList);
-        FileOutputObject outputFullsAndEmpties = calculateFullsForInstanceTypes(calculatedList, outputEmpties);
-        calculateMostFilled(calculatedList, outputFullsAndEmpties);
-        fp.writeToFileValidOnes(outputFullsAndEmpties, OUTPUT_FILE_NAME);
+        try{
+            
+            List<MyObject> listOfObjects = fp.getListFromFile(fileMap.get("INPUT_FILE_NAME"),fileMap.get("LOG_FILE_NAME"));
+            List<MyObject> calculatedList = calculateFullAndEmpty(listOfObjects);
+            FileOutputObject outputEmpties = calculateEmptiesForInstanceTypes(calculatedList);
+            FileOutputObject outputFullsAndEmpties = calculateFullsForInstanceTypes(calculatedList, outputEmpties);
+            calculateMostFilled(calculatedList, outputFullsAndEmpties);
+            fp.writeToFileValidOnes(outputFullsAndEmpties, fileMap.get("OUTPUT_FILE_NAME"));
+        }
+        catch(Exception e){
+            LOGGER.log(Level.SEVERE, "Input File not found in the directory");
+        }
     }
-
 
     public List<MyObject> calculateFullAndEmpty(List<MyObject> listOfObjects) throws IOException{
 
@@ -44,6 +49,12 @@ public class CalculationImplementation {
 
                 int numberOfEmpty = (int) myObject.getSlotStates().stream().filter(p->p.equals(EMPTY)).count();
                 myObject.setNumberOfEmpties(numberOfEmpty);
+                
+                if(!utility.isTotalSlotEqualSumOfEmptyAndFull(myObject, numberOfEmpty+numberOfFull)){
+                    // TODO log write
+                    fp.writeToLogFile(myObject.getHostId() + " " +myObject.getInstanceType() + 
+                            ": Sum of Empties "+ numberOfEmpty + " and fulls "+ numberOfFull +" is not equal to total slots "+ myObject.getNumberOfSlots() +"\r\n" , fileMap.get("LOG_FILE_NAME"));
+                }
             }
         }
         return listOfObjects;
@@ -113,6 +124,5 @@ public class CalculationImplementation {
 
         return output;
     }
-
 
 }
